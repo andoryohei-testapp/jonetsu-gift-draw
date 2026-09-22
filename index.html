@@ -175,6 +175,15 @@
       padding-inline: 24px;
     }
 
+    .sound-button {
+      min-height: 44px;
+      padding-inline: 18px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid #d9d0d1;
+      font-size: .88rem;
+    }
+
     .entry-panel {
       align-self: start;
       padding: 20px 22px;
@@ -255,6 +264,7 @@
     <div class="actions">
       <button class="start-button" id="startButton" type="button">抽選スタート</button>
       <button class="reset-button" id="resetButton" type="button">リセット</button>
+      <button class="sound-button" id="soundButton" type="button" aria-pressed="true">効果音 ON</button>
     </div>
 
     <section class="entry-panel">
@@ -274,12 +284,126 @@
       const namesInput = document.getElementById('namesInput');
       const startButton = document.getElementById('startButton');
       const resetButton = document.getElementById('resetButton');
+      const soundButton = document.getElementById('soundButton');
       const displayName = document.getElementById('displayName');
       const status = document.getElementById('status');
       const count = document.getElementById('count');
       const error = document.getElementById('error');
       const drawStage = document.getElementById('drawStage');
       let drawing = false;
+      let soundEnabled = true;
+      let audioContext = null;
+      let rollTimer = null;
+      let rollGain = null;
+
+      const getAudioContext = () => {
+        if (!audioContext) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return null;
+          audioContext = new AudioContext();
+        }
+        if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+        return audioContext;
+      };
+
+      const playDrumHit = (context, output) => {
+        const now = context.currentTime;
+        const length = Math.floor(context.sampleRate * .045);
+        const buffer = context.createBuffer(1, length, context.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let index = 0; index < length; index += 1) {
+          data[index] = (Math.random() * 2 - 1) * (1 - index / length);
+        }
+
+        const noise = context.createBufferSource();
+        const filter = context.createBiquadFilter();
+        const hitGain = context.createGain();
+        noise.buffer = buffer;
+        filter.type = 'bandpass';
+        filter.frequency.value = 950;
+        filter.Q.value = .7;
+        hitGain.gain.setValueAtTime(.72, now);
+        hitGain.gain.exponentialRampToValueAtTime(.001, now + .045);
+        noise.connect(filter).connect(hitGain).connect(output);
+        noise.start(now);
+        noise.stop(now + .05);
+      };
+
+      const stopDrumroll = () => {
+        if (rollTimer !== null) {
+          clearInterval(rollTimer);
+          rollTimer = null;
+        }
+        if (rollGain && audioContext) {
+          const now = audioContext.currentTime;
+          rollGain.gain.cancelScheduledValues(now);
+          rollGain.gain.setValueAtTime(Math.max(rollGain.gain.value, .0001), now);
+          rollGain.gain.exponentialRampToValueAtTime(.0001, now + .04);
+          const finishedGain = rollGain;
+          setTimeout(() => finishedGain.disconnect(), 70);
+        }
+        rollGain = null;
+      };
+
+      const startDrumroll = () => {
+        stopDrumroll();
+        if (!soundEnabled) return;
+        try {
+          const context = getAudioContext();
+          if (!context) return;
+          rollGain = context.createGain();
+          rollGain.gain.value = .42;
+          rollGain.connect(context.destination);
+          playDrumHit(context, rollGain);
+          rollTimer = setInterval(() => {
+            if (rollGain) playDrumHit(context, rollGain);
+          }, 72);
+        } catch (_) {
+          stopDrumroll();
+        }
+      };
+
+      const playFinalHit = () => {
+        if (!soundEnabled) return;
+        try {
+          const context = getAudioContext();
+          if (!context) return;
+          const now = context.currentTime;
+          const master = context.createGain();
+          master.gain.value = .42;
+          master.connect(context.destination);
+
+          const playNote = (frequency, start, duration, volume = .22) => {
+            const oscillator = context.createOscillator();
+            const filter = context.createBiquadFilter();
+            const noteGain = context.createGain();
+            const noteStart = now + start;
+            const noteEnd = noteStart + duration;
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.value = frequency;
+            filter.type = 'lowpass';
+            filter.frequency.value = 1800;
+            noteGain.gain.setValueAtTime(.0001, noteStart);
+            noteGain.gain.exponentialRampToValueAtTime(volume, noteStart + .018);
+            noteGain.gain.setValueAtTime(volume, noteEnd - .08);
+            noteGain.gain.exponentialRampToValueAtTime(.0001, noteEnd);
+            oscillator.connect(filter).connect(noteGain).connect(master);
+            oscillator.start(noteStart);
+            oscillator.stop(noteEnd + .02);
+          };
+
+          // 短い上昇フレーズの後、明るい和音で締める。
+          playNote(392, 0, .16);
+          playNote(523.25, .16, .16);
+          playNote(659.25, .32, .2);
+          [523.25, 659.25, 783.99].forEach(frequency => {
+            playNote(frequency, .52, .58, .17);
+          });
+          setTimeout(() => master.disconnect(), 1180);
+        } catch (_) {
+          // 音声が使えない環境でも抽選処理はそのまま続行する。
+        }
+      };
 
       const getNames = () => namesInput.value
         .split(/\r?\n/)
@@ -332,6 +456,7 @@
         startButton.disabled = true;
         resetButton.disabled = true;
         status.textContent = '抽選中';
+        startDrumroll();
 
         const steps = 30;
         let previous = '';
@@ -352,6 +477,8 @@
         displayName.textContent = winner;
         status.textContent = '当選おめでとうございます！';
         drawStage.classList.add('winner');
+        stopDrumroll();
+        playFinalHit();
         document.body.classList.remove('drawing');
         namesInput.disabled = false;
         startButton.disabled = false;
@@ -360,6 +487,7 @@
       }
 
       function resetDraw() {
+        stopDrumroll();
         if (drawing) return;
         drawStage.classList.remove('winner');
         displayName.classList.remove('flipping');
@@ -369,9 +497,17 @@
         displayName.textContent = total ? `${total}名` : '準備中';
       }
 
+      function toggleSound() {
+        soundEnabled = !soundEnabled;
+        soundButton.textContent = `効果音 ${soundEnabled ? 'ON' : 'OFF'}`;
+        soundButton.setAttribute('aria-pressed', String(soundEnabled));
+        if (!soundEnabled) stopDrumroll();
+      }
+
       namesInput.addEventListener('input', updateCount);
       startButton.addEventListener('click', startDraw);
       resetButton.addEventListener('click', resetDraw);
+      soundButton.addEventListener('click', toggleSound);
     })();
   </script>
 </body>
