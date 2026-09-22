@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>情熱チャプター プレゼント抽選</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --red: #cf2030;
+      --red-dark: #a81220;
+      --ink: #242124;
+      --muted: #6f686b;
+      --line: #e8e1e2;
+      --paper: #ffffff;
+      --bg: #f7f3f2;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 50% -20%, #fff 0, #fff 28%, transparent 58%),
+        var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+        "Yu Gothic", "Meiryo", sans-serif;
+    }
+
+    button, textarea { font: inherit; }
+
+    .app {
+      width: min(1120px, calc(100% - 40px));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 34px 0 32px;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr;
+      gap: 22px;
+    }
+
+    header { text-align: center; }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--red);
+      font-size: clamp(.78rem, 1.3vw, .92rem);
+      font-weight: 800;
+      letter-spacing: .18em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.4rem, 3.2vw, 2.35rem);
+      letter-spacing: .04em;
+    }
+
+    .draw-stage {
+      position: relative;
+      min-height: clamp(250px, 39vh, 390px);
+      padding: 34px;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      box-shadow: 0 18px 50px rgba(74, 36, 40, .1);
+      isolation: isolate;
+    }
+
+    .draw-stage::before,
+    .draw-stage::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      background: var(--red);
+    }
+
+    .draw-stage::before { left: 0; }
+    .draw-stage::after { right: 0; }
+
+    .name-wrap {
+      width: 100%;
+      text-align: center;
+      perspective: 700px;
+    }
+
+    .status {
+      min-height: 1.7em;
+      margin-bottom: 14px;
+      color: var(--red);
+      font-size: clamp(.85rem, 1.7vw, 1.1rem);
+      font-weight: 800;
+      letter-spacing: .18em;
+    }
+
+    .name {
+      display: block;
+      width: 100%;
+      font-size: clamp(3rem, 9.3vw, 7.6rem);
+      font-weight: 900;
+      line-height: 1.06;
+      letter-spacing: .02em;
+      overflow-wrap: anywhere;
+      transform-origin: center;
+    }
+
+    .name.flipping { animation: flip .16s ease-in-out; }
+
+    @keyframes flip {
+      0% { opacity: .32; transform: rotateX(-55deg) translateY(-7px); }
+      100% { opacity: 1; transform: rotateX(0) translateY(0); }
+    }
+
+    .draw-stage.winner {
+      border-color: #f0c9ce;
+      animation: winner-glow .7s ease-out;
+    }
+
+    .draw-stage.winner .name {
+      color: var(--red);
+      animation: winner-pop .72s cubic-bezier(.2, .9, .25, 1.2);
+    }
+
+    @keyframes winner-pop {
+      0% { opacity: .2; transform: scale(.76); }
+      60% { transform: scale(1.07); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes winner-glow {
+      0% { box-shadow: 0 18px 50px rgba(74, 36, 40, .1); }
+      45% { box-shadow: 0 18px 65px rgba(207, 32, 48, .28); }
+      100% { box-shadow: 0 18px 50px rgba(74, 36, 40, .1); }
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+    }
+
+    button {
+      min-height: 58px;
+      border: 0;
+      border-radius: 999px;
+      padding: 0 32px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+    }
+
+    button:hover:not(:disabled) { transform: translateY(-2px); }
+    button:focus-visible { outline: 4px solid rgba(207, 32, 48, .22); outline-offset: 3px; }
+    button:disabled { cursor: not-allowed; opacity: .5; }
+
+    .start-button {
+      min-width: min(340px, 72vw);
+      color: white;
+      background: linear-gradient(135deg, #dc2738, var(--red-dark));
+      box-shadow: 0 10px 24px rgba(168, 18, 32, .24);
+      font-size: clamp(1.1rem, 2vw, 1.35rem);
+    }
+
+    .reset-button {
+      color: var(--muted);
+      background: #ebe5e5;
+      padding-inline: 24px;
+    }
+
+    .entry-panel {
+      align-self: start;
+      padding: 20px 22px;
+      background: rgba(255, 255, 255, .72);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+    }
+
+    .entry-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    label { font-weight: 800; }
+
+    .count {
+      color: var(--muted);
+      font-size: .9rem;
+      white-space: nowrap;
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 122px;
+      resize: vertical;
+      padding: 14px 16px;
+      color: var(--ink);
+      background: white;
+      border: 2px solid #ddd5d6;
+      border-radius: 12px;
+      line-height: 1.65;
+    }
+
+    textarea:focus { border-color: var(--red); outline: 3px solid rgba(207, 32, 48, .1); }
+    textarea::placeholder { color: #aaa1a3; }
+
+    .error {
+      min-height: 1.5em;
+      margin: 8px 2px 0;
+      color: var(--red-dark);
+      font-size: .9rem;
+      font-weight: 700;
+    }
+
+    body.drawing .entry-panel { opacity: .42; }
+
+    @media (max-width: 620px) {
+      .app { width: min(100% - 24px, 1120px); padding-top: 22px; gap: 15px; }
+      .draw-stage { min-height: 260px; padding: 22px 18px; border-radius: 20px; }
+      .actions { flex-direction: column; }
+      .reset-button { min-height: 46px; }
+      .entry-panel { padding: 16px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <p class="eyebrow">BNI JONETSU CHAPTER</p>
+      <h1>情熱チャプター プレゼント抽選</h1>
+    </header>
+
+    <section class="draw-stage" id="drawStage" aria-live="polite" aria-atomic="true">
+      <div class="name-wrap">
+        <div class="status" id="status">抽選する方のお名前を入力してください</div>
+        <div class="name" id="displayName">準備中</div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button class="start-button" id="startButton" type="button">抽選スタート</button>
+      <button class="reset-button" id="resetButton" type="button">リセット</button>
+    </div>
+
+    <section class="entry-panel">
+      <div class="entry-heading">
+        <label for="namesInput">抽選対象者</label>
+        <span class="count" id="count">0名</span>
+      </div>
+      <textarea id="namesInput" placeholder="お名前を1行に1名ずつ貼り付けてください&#10;&#10;例：&#10;山田 太郎&#10;佐藤 花子&#10;鈴木 一郎" spellcheck="false"></textarea>
+      <p class="error" id="error" role="alert"></p>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const namesInput = document.getElementById('namesInput');
+      const startButton = document.getElementById('startButton');
+      const resetButton = document.getElementById('resetButton');
+      const displayName = document.getElementById('displayName');
+      const status = document.getElementById('status');
+      const count = document.getElementById('count');
+      const error = document.getElementById('error');
+      const drawStage = document.getElementById('drawStage');
+      let drawing = false;
+
+      const getNames = () => namesInput.value
+        .split(/\r?\n/)
+        .map(name => name.trim())
+        .filter(Boolean);
+
+      const secureRandomIndex = (length) => {
+        const max = Math.floor(0x100000000 / length) * length;
+        const value = new Uint32Array(1);
+        do {
+          crypto.getRandomValues(value);
+        } while (value[0] >= max);
+        return value[0] % length;
+      };
+
+      const showName = (name) => {
+        displayName.textContent = name;
+        displayName.classList.remove('flipping');
+        void displayName.offsetWidth;
+        displayName.classList.add('flipping');
+      };
+
+      const updateCount = () => {
+        const total = getNames().length;
+        count.textContent = `${total}名`;
+        if (!drawing && total > 0 && displayName.textContent === '準備中') {
+          status.textContent = '準備完了';
+          displayName.textContent = `${total}名`;
+        }
+      };
+
+      const wait = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+      async function startDraw() {
+        if (drawing) return;
+
+        const names = getNames();
+        if (names.length < 2) {
+          error.textContent = 'お名前を2名以上入力してください。';
+          namesInput.focus();
+          return;
+        }
+
+        drawing = true;
+        error.textContent = '';
+        const winner = names[secureRandomIndex(names.length)];
+        document.body.classList.add('drawing');
+        drawStage.classList.remove('winner');
+        namesInput.disabled = true;
+        startButton.disabled = true;
+        resetButton.disabled = true;
+        status.textContent = '抽選中';
+
+        const steps = 30;
+        let previous = '';
+        for (let step = 0; step < steps; step += 1) {
+          let next = names[Math.floor(Math.random() * names.length)];
+          if (names.length > 1) {
+            while (next === previous) next = names[Math.floor(Math.random() * names.length)];
+          }
+          previous = next;
+          showName(next);
+
+          const progress = step / (steps - 1);
+          const delay = 55 + Math.pow(progress, 3.1) * 360;
+          await wait(delay);
+        }
+
+        displayName.classList.remove('flipping');
+        displayName.textContent = winner;
+        status.textContent = '当選おめでとうございます！';
+        drawStage.classList.add('winner');
+        document.body.classList.remove('drawing');
+        namesInput.disabled = false;
+        startButton.disabled = false;
+        resetButton.disabled = false;
+        drawing = false;
+      }
+
+      function resetDraw() {
+        if (drawing) return;
+        drawStage.classList.remove('winner');
+        displayName.classList.remove('flipping');
+        error.textContent = '';
+        const total = getNames().length;
+        status.textContent = total ? '準備完了' : '抽選する方のお名前を入力してください';
+        displayName.textContent = total ? `${total}名` : '準備中';
+      }
+
+      namesInput.addEventListener('input', updateCount);
+      startButton.addEventListener('click', startDraw);
+      resetButton.addEventListener('click', resetDraw);
+    })();
+  </script>
+</body>
+</html>
